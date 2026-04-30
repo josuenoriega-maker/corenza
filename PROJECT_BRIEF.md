@@ -252,7 +252,7 @@ Ambos contradijeron al usuario en momentos clave (ej. el papá detectó que el l
 
 ## 10. Features diferenciadores prioritarios
 
-Estas 3 features fueron identificadas como diferenciadores críticos vs OpenSIS y SIS americanos genéricos. Reflejan necesidades reales del mercado guatemalteco/latinoamericano y deben implementarse cuando se construya el módulo correspondiente.
+Estas 5 features fueron identificadas como diferenciadores críticos vs OpenSIS y SIS americanos genéricos. Reflejan necesidades reales del mercado guatemalteco/latinoamericano y de seguridad institucional.
 
 ### Feature A — Cobros offline (Billing)
 
@@ -283,10 +283,25 @@ Solo perfiles autorizados pueden registrar pagos manuales offline. Auditoría co
 
 Sistema de niveles de edición para evitar fraude pero permitir corregir errores humanos:
 
-- **Campos críticos** (DPI, fecha de nacimiento, ID oficial, números de identificación legal): solo editables por `school_admin` con justificación obligatoria registrada en audit log.
-- **Campos no-críticos** (nombre con typo, dirección, teléfono, email, observaciones): editables por roles autorizados sin restricción especial.
+- **Campos críticos** (DPI, fecha de nacimiento, ID oficial): solo editables por `school_admin` con justificación obligatoria registrada.
+- **Campos no-críticos** (nombre con typo, dirección, teléfono): editables por roles autorizados sin restricción especial.
 
-**Audit log obligatorio** en todas las tablas con campos editables: registrar quién cambió qué, cuándo, valor anterior y valor nuevo.
+Tabla `field_change_audit_log` con: `school_id`, `user_id`, `entity_type`, `entity_id`, `field_name`, `old_value`, `new_value`, `reason`, `changed_at`.
 
-Tabla sugerida: `field_change_audit_log` con columnas:
-`school_id`, `user_id`, `entity_type`, `entity_id`, `field_name`, `old_value`, `new_value`, `reason`, `changed_at`.
+---
+
+### Feature D — RBAC flexible multi-rol
+
+Cada usuario puede tener múltiples roles simultáneos asignados. Ejemplo: la secretaria con info@woodbridge.gt puede ser `cashier` Y `accounting` al mismo tiempo. Roles asignables y revocables en cualquier momento por `super_admin` o `school_admin`.
+
+Tabla `user_roles` many-to-many con: `user_id`, `role_id`, `school_id`, `granted_by`, `granted_at`, `expires_at` (NULL = permanente), `is_active`, `reason`, `revoked_at`.
+
+---
+
+### Feature E — Permisos temporales y auditoría de accesos
+
+- **Permisos temporales:** roles con `expires_at` para acceso automático limitado (ej. ayudante en temporada de matrícula). Pasada la fecha, el sistema marca `is_active = false` automáticamente.
+- **Suspender sin borrar:** flag `is_active` para revocar acceso sin eliminar la cuenta del usuario ni perder su historial.
+- **Audit log de accesos:** tabla `access_audit_log` con `user_id`, `action`, `entity_type`, `entity_id`, `ip_address`, `created_at`. Registra logins, vistas a información sensible (pagos, expedientes), modificaciones, etc.
+
+Diseñado pensando en seguridad institucional, trazabilidad ante auditorías, y flexibilidad operativa real (gente que ayuda temporal, secretarias con múltiples funciones, etc.).
