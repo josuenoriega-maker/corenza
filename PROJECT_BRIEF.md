@@ -305,3 +305,52 @@ Tabla `user_roles` many-to-many con: `user_id`, `role_id`, `school_id`, `granted
 - **Audit log de accesos:** tabla `access_audit_log` con `user_id`, `action`, `entity_type`, `entity_id`, `ip_address`, `created_at`. Registra logins, vistas a información sensible (pagos, expedientes), modificaciones, etc.
 
 Diseñado pensando en seguridad institucional, trazabilidad ante auditorías, y flexibilidad operativa real (gente que ayuda temporal, secretarias con múltiples funciones, etc.).
+
+---
+
+## 11. Modelo de roles y relaciones
+
+### Roles disponibles (ENUM `app_role`)
+
+`super_admin`, `school_admin`, `secretary`, `staff`, `teacher`,
+`student`, `guardian`, `cashier`, `accounting`.
+
+### Decisiones arquitectónicas clave
+
+**1. `secretary` y `staff` coexisten — no se reemplazan.**
+
+| Rol | Quién lo usa | Permisos típicos |
+|---|---|---|
+| `secretary` | Secretaría de dirección, front desk | Admisiones, citas, comunicaciones, enrollment |
+| `staff` | Coordinadores académicos, psicólogos, orientadores, bibliotecarios, IT | Acceso a módulos específicos vía permission_profiles |
+| `teacher` | Docentes | Calificaciones, asistencia, planes de clase |
+
+`secretary` es un subconjunto de `staff` conceptualmente, pero en el sistema son roles separados con permisos distintos. Esta distinción es relevante en el mercado guatemalteco donde "la secretaria" tiene responsabilidades muy definidas.
+
+**2. `guardian` es el único rol de acceso para tutores del estudiante.**
+
+La distinción legal (Padre / Madre / Tutor / Abuelo) NO vive en el rol — vive en `student_guardians.relationship`.
+
+**Razón:** Un padre biológico, una madre biológica, un tutor legal y un abuelo cuidador necesitan exactamente los mismos permisos en el sistema (ver calificaciones, recibir comunicaciones, firmar documentos). La distinción legal solo importa cuando un documento oficial (transcript, certificado) necesita imprimir el vínculo. En ese caso se lee de `student_guardians.relationship`, no del rol.
+
+Por lo tanto: NO existe rol `parent`. `guardian` cubre todos los casos.
+
+**3. `cashier` y `accounting` agregados anticipando módulo de Billing.**
+
+Migración `20260430_add_widgets_system_and_billing_roles.sql`. Implementan la Feature B del PROJECT_BRIEF (roles granulares de billing):
+- `cashier`: registra pagos manualmente, genera recibos. NO modifica tarifas ni configuraciones.
+- `accounting`: verifica/concilia pagos, aprueba o rechaza pagos en estado `pending_verification`.
+
+---
+
+## 12. Deuda técnica conocida
+
+Esta sección registra decisiones técnicas pendientes para que no se olviden.
+
+### `dashlet_settings` (legacy)
+
+La tabla `dashlet_settings` existe en el schema desde antes del sistema de widgets. Era un sistema ad-hoc de configuración de dashboard sin catálogo central. La nueva arquitectura de widgets (`widgets`, `school_widgets`, `user_widget_preferences`) la reemplaza con un diseño más estructurado y escalable.
+
+**Decisión actual:** Dejar `dashlet_settings` en el schema sin borrar y NO usarla en el nuevo dashboard.
+
+**Acción futura:** Migrar la información existente (si hay) a las nuevas tablas y eliminar `dashlet_settings` cuando ningún componente la use. Hacer en una iteración futura cuando el nuevo sistema esté estable.
